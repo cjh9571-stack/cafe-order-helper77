@@ -38,7 +38,8 @@
     position:relative; min-height:260px; width:100%;
     background:repeating-linear-gradient(45deg,#0f1c38,#0f1c38 10px,#101e3d 10px,#101e3d 20px);
   }
-  #menuImg { display:block; width:100%; height:auto; }
+  #menuImgClip { position:relative; overflow:hidden; touch-action:none; }
+  #menuImg { display:block; width:100%; height:auto; transform-origin:0 0; }
   #stagePlaceholder {
     position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     color:#5f7aa8; font-size:13px; text-align:center; padding:20px; pointer-events:none;
@@ -198,7 +199,9 @@
 
 <div id="stageWrap">
   <div id="stage">
-    <img id="menuImg" hidden>
+    <div id="menuImgClip">
+      <img id="menuImg" hidden>
+    </div>
     <div id="stagePlaceholder">메뉴판을 촬영하고, 인원 사진을 찍으면<br>여기에 얼굴카드가 표시돼요.<br>카드를 눌러 선택한 뒤 마이크를 눌러 메뉴를 말하세요.</div>
   </div>
 </div>
@@ -261,9 +264,13 @@ let cardCounter = 0;
 let selectedCardId = null; // uid
 let modelsLoaded = false;
 let lastSummaryText = '';
-let cardAreaTop = 16; // 얼굴카드 기본 배치 y좌표 (메뉴판 사진 아래쪽으로 자동 조정)
+
+const CARDS_PER_ROW = 4;
+const CARD_ROW_HEIGHT = 78;
+const CARD_AREA_BASE_TOP = 10;
 
 const stage = document.getElementById('stage');
+const menuImgClip = document.getElementById('menuImgClip');
 const menuImg = document.getElementById('menuImg');
 const stagePlaceholder = document.getElementById('stagePlaceholder');
 const micBtn = document.getElementById('micBtn');
@@ -339,23 +346,114 @@ document.getElementById('menuPhotoInput').addEventListener('change', (e) => {
   e.target.value = '';
 });
 menuImg.addEventListener('load', () => {
-  recalcCardAreaTop();
+  resetImgZoom();
   updateStageMinHeight();
 });
 
-function recalcCardAreaTop() {
-  cardAreaTop = (!menuImg.hidden && menuImg.clientHeight) ? menuImg.clientHeight + 16 : 16;
+// 인물카드는 항상 메뉴판 위쪽에 배치되고, 카드 줄 수가 늘어나면 메뉴판을 그만큼 아래로 밀어냄
+function updateCardAreaLayout() {
+  const rowCount = cards.length > 0 ? Math.ceil(cards.length / CARDS_PER_ROW) : 0;
+  const areaHeight = rowCount > 0 ? CARD_AREA_BASE_TOP + rowCount * CARD_ROW_HEIGHT + 10 : 0;
+  stage.style.paddingTop = areaHeight + 'px';
 }
 
 function updateStageMinHeight() {
-  let maxBottom = cardAreaTop;
+  let maxBottom = 0;
   cards.forEach(c => {
     const top = parseFloat(c.el.style.top) || 0;
     maxBottom = Math.max(maxBottom, top + 90);
   });
-  const imgBottom = (!menuImg.hidden ? menuImg.clientHeight : 0);
-  stage.style.minHeight = Math.max(260, imgBottom, maxBottom + 20) + 'px';
+  stage.style.minHeight = Math.max(260, maxBottom + 20) + 'px';
 }
+
+// ══════════════════════════════════════════
+//  메뉴판 확대/축소 (핀치 줌 + 더블탭, 카드와는 별개로 이미지만 확대)
+// ══════════════════════════════════════════
+let imgScale = 1, imgTranslateX = 0, imgTranslateY = 0;
+const MIN_SCALE = 1, MAX_SCALE = 4;
+const activeImgPointers = new Map();
+let pinchStartDist = 0, pinchStartScale = 1;
+let imgPanStart = null;
+let lastTapTime = 0;
+
+function applyImgTransform() {
+  menuImg.style.transform = `translate(${imgTranslateX}px, ${imgTranslateY}px) scale(${imgScale})`;
+}
+
+function resetImgZoom() {
+  imgScale = 1; imgTranslateX = 0; imgTranslateY = 0;
+  applyImgTransform();
+}
+
+function clampImgPan() {
+  const w = menuImgClip.clientWidth, h = menuImgClip.clientHeight;
+  const maxX = (w * (imgScale - 1)) / 2 + 40;
+  const maxY = (h * (imgScale - 1)) / 2 + 40;
+  imgTranslateX = Math.max(-maxX, Math.min(maxX, imgTranslateX));
+  imgTranslateY = Math.max(-maxY, Math.min(maxY, imgTranslateY));
+}
+
+menuImgClip.addEventListener('pointerdown', (e) => {
+  menuImgClip.setPointerCapture(e.pointerId);
+  activeImgPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (activeImgPointers.size === 2) {
+    const pts = [...activeImgPointers.values()];
+    pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    pinchStartScale = imgScale;
+    imgPanStart = null;
+  } else if (activeImgPointers.size === 1) {
+    imgPanStart = { x: e.clientX, y: e.clientY, tx: imgTranslateX, ty: imgTranslateY };
+  }
+});
+
+menuImgClip.addEventListener('pointermove', (e) => {
+  if (!activeImgPointers.has(e.pointerId)) return;
+  activeImgPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (activeImgPointers.size === 2) {
+    const pts = [...activeImgPointers.values()];
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    if (pinchStartDist > 0) {
+      imgScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pinchStartScale * (dist / pinchStartDist)));
+      clampImgPan();
+      applyImgTransform();
+    }
+  } else if (activeImgPointers.size === 1 && imgPanStart && imgScale > 1) {
+    imgTranslateX = imgPanStart.tx + (e.clientX - imgPanStart.x);
+    imgTranslateY = imgPanStart.ty + (e.clientY - imgPanStart.y);
+    clampImgPan();
+    applyImgTransform();
+  }
+});
+
+function endImgPointer(e) {
+  activeImgPointers.delete(e.pointerId);
+  if (activeImgPointers.size === 1) {
+    const p = [...activeImgPointers.values()][0];
+    imgPanStart = { x: p.x, y: p.y, tx: imgTranslateX, ty: imgTranslateY };
+  } else {
+    imgPanStart = null;
+    pinchStartDist = 0;
+  }
+}
+menuImgClip.addEventListener('pointerup', endImgPointer);
+menuImgClip.addEventListener('pointercancel', endImgPointer);
+
+menuImgClip.addEventListener('pointerup', (e) => {
+  if (activeImgPointers.size > 0) return;
+  const now = Date.now();
+  if (now - lastTapTime < 300) {
+    lastTapTime = 0;
+    if (imgScale > 1) {
+      imgScale = 1; imgTranslateX = 0; imgTranslateY = 0;
+    } else {
+      imgScale = 2; imgTranslateX = 0; imgTranslateY = 0;
+    }
+    applyImgTransform();
+  } else {
+    lastTapTime = now;
+  }
+});
 
 // ══════════════════════════════════════════
 //  얼굴 인식 모델
@@ -401,7 +499,6 @@ document.getElementById('groupPhotoInput').addEventListener('change', async (e) 
   try {
     const img = await loadImageFromFile(file);
     await ensureModelsLoaded();
-    recalcCardAreaTop();
     const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }));
     if (detections.length === 0) {
       toast('얼굴을 찾지 못했어요. 인물 추가로 직접 만들어주세요.');
@@ -439,14 +536,15 @@ function addCard(thumbSrc) {
 
   const card = { uid, el, orderMap: {}, name: '', thumbSrc, displayLabel: 0 };
   const idx = cards.length;
-  const col = idx % 4;
-  const row = Math.floor(idx / 4);
+  const col = idx % CARDS_PER_ROW;
+  const row = Math.floor(idx / CARDS_PER_ROW);
   el.style.left = (10 + col * 72) + 'px';
-  el.style.top = (cardAreaTop + row * 78) + 'px';
+  el.style.top = (CARD_AREA_BASE_TOP + row * CARD_ROW_HEIGHT) + 'px';
 
   cards.push(card);
   makeDraggable(card);
   renumberCards();
+  updateCardAreaLayout();
   updateStageMinHeight();
 
   el.querySelector('.card-del').addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -471,14 +569,25 @@ function removeCard(uid) {
   cards[idx].el.remove();
   cards.splice(idx, 1);
   renumberCards();
+  updateCardAreaLayout();
   updateStageMinHeight();
-  if (selectedCardId === uid) {
-    selectedCardId = null;
-    hideCardPanel();
-    micBtn.disabled = true;
-    micLabel.textContent = '카드를 선택하세요';
-  }
+  if (selectedCardId === uid) deselectCard();
 }
+
+function deselectCard() {
+  if (selectedCardId === null) return;
+  selectedCardId = null;
+  cards.forEach(c => c.el.classList.remove('selected'));
+  hideCardPanel();
+  micBtn.disabled = true;
+  micLabel.textContent = '카드를 선택하세요';
+}
+
+// 메뉴판이나 카드 옆 빈 공간을 누르면 열려있던 카드 패널을 닫음
+stage.addEventListener('click', (e) => {
+  if (e.target.closest('.face-card')) return;
+  deselectCard();
+});
 
 function makeDraggable(card) {
   let dragging = false, moved = false, startX, startY, startLeft, startTop;
@@ -821,8 +930,9 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   selectedCardId = null;
   menuImg.src = '';
   menuImg.hidden = true;
+  resetImgZoom();
   stagePlaceholder.hidden = false;
-  cardAreaTop = 16;
+  stage.style.paddingTop = '';
   stage.style.minHeight = '';
   hideCardPanel();
   micBtn.disabled = true;
