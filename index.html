@@ -33,7 +33,7 @@
   .tbtn:active { background:#274176; }
   .tbtn.danger { border-color:#7f1d1d; color:#fca5a5; }
 
-  #stageWrap { flex:1; position:relative; overflow:auto; background:#0d1830; }
+  #stageWrap { flex:1; position:relative; overflow:auto; background:#0d1830; min-height:0; }
   #stage {
     position:relative; min-height:260px; width:100%;
     background:repeating-linear-gradient(45deg,#0f1c38,#0f1c38 10px,#101e3d 10px,#101e3d 20px);
@@ -53,8 +53,12 @@
     border:3px solid #6a9acd; background:#274176; display:flex; align-items:center; justify-content:center;
     font-weight:700; font-size:18px; color:#fff;
   }
+  .card-generic { font-size:22px; }
   .face-card.selected img, .face-card.selected .card-generic { border-color:#fbbf24; box-shadow:0 0 0 3px rgba(251,191,36,.35); }
-  .card-label { font-size:11px; color:#dbe6f8; margin-top:2px; background:#0b1324cc; padding:1px 6px; border-radius:8px; }
+  .card-label {
+    font-size:11px; color:#dbe6f8; margin-top:2px; background:#0b1324cc; padding:1px 6px; border-radius:8px;
+    max-width:74px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
   .card-count {
     position:absolute; top:-4px; right:6px; background:#ef4444; color:#fff; font-size:11px;
     font-weight:700; min-width:18px; height:18px; border-radius:9px; display:flex; align-items:center; justify-content:center;
@@ -66,9 +70,41 @@
     cursor:pointer;
   }
 
+  /* 선택된 카드 패널 */
+  #cardPanel {
+    background:#141f3d; border-top:1px solid #2d4a80; padding:10px 14px 4px; flex-shrink:0;
+  }
+  #cardOrderList { max-height:150px; overflow-y:auto; margin-bottom:8px; }
+  .order-empty { font-size:12px; color:#6b7280; padding:6px 2px; }
+  .order-row {
+    display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid #1f2c4d; font-size:13px;
+  }
+  .order-menu { flex:1; color:#e8eaf0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .qty-btn {
+    width:26px; height:26px; border-radius:6px; border:1px solid #3a5a90; background:#1a2d55;
+    color:#dbe6f8; font-size:15px; line-height:1; cursor:pointer; flex-shrink:0;
+  }
+  .order-qty { min-width:18px; text-align:center; font-weight:700; flex-shrink:0; }
+  .order-del {
+    width:22px; height:22px; border-radius:50%; border:1px solid #4b5563; background:#1f2937;
+    color:#fca5a5; font-size:12px; cursor:pointer; flex-shrink:0;
+  }
+  .manual-add-row { display:flex; gap:8px; margin-bottom:8px; }
+  .manual-add-row input {
+    flex:1; padding:8px 10px; border-radius:8px; border:1px solid #3a5a90; background:#111e3a;
+    color:#e8eaf0; font-size:13px;
+  }
+  .manual-add-row button {
+    padding:8px 14px; border-radius:8px; border:none; background:#3b82f6; color:#fff; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  #cardNameInput {
+    width:100%; padding:8px 10px; margin-bottom:10px; border-radius:8px; border:1px solid #3a5a90;
+    background:#111e3a; color:#e8eaf0; font-size:13px;
+  }
+
   #bottombar {
     display:flex; align-items:center; gap:12px; padding:10px 14px;
-    background:#111e3a; border-top:1px solid #2d4a80;
+    background:#111e3a; border-top:1px solid #2d4a80; flex-shrink:0;
   }
   #micLabel { flex:1; font-size:12px; color:#9cb8d8; }
   #micBtn {
@@ -125,7 +161,8 @@
   }
   .grand-total { text-align:right; font-size:13px; color:#fbbf24; margin:6px 0 4px; }
   .person-block { margin-bottom:14px; padding:10px; background:#101c38; border-radius:10px; }
-  .person-title { font-size:13px; font-weight:700; color:#93c5fd; margin-bottom:6px; }
+  .person-title { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#93c5fd; margin-bottom:8px; }
+  .mini-avatar { width:26px; height:26px; border-radius:50%; object-fit:cover; background:#274176; flex-shrink:0; }
   #statusFooter { padding:12px 16px; border-top:1px solid #2d4a80; display:flex; gap:8px; }
   #statusFooter button {
     flex:1; padding:12px; border-radius:8px; border:none; font-size:14px; font-weight:700; cursor:pointer;
@@ -151,9 +188,10 @@
   <h1>☕ 카페 주문 도우미</h1>
   <button class="tbtn" id="menuPhotoBtn">📋 메뉴판 촬영</button>
   <button class="tbtn" id="groupPhotoBtn">🧑‍🤝‍🧑 인원 촬영</button>
-  <button class="tbtn" id="addCardBtn">➕ 카드 추가</button>
+  <button class="tbtn" id="addCardBtn">➕ 인물 추가</button>
   <button class="tbtn" id="statusBtn">📊 현황</button>
-  <button class="tbtn danger" id="resetBtn">초기화</button>
+  <button class="tbtn" id="orderResetBtn">🔄 주문 초기화</button>
+  <button class="tbtn danger" id="resetBtn">🗑️ 전체 초기화</button>
   <input type="file" id="menuPhotoInput" accept="image/*" capture="environment" hidden>
   <input type="file" id="groupPhotoInput" accept="image/*" capture="environment" hidden>
 </div>
@@ -163,6 +201,15 @@
     <img id="menuImg" hidden>
     <div id="stagePlaceholder">메뉴판을 촬영하고, 인원 사진을 찍으면<br>여기에 얼굴카드가 표시돼요.<br>카드를 눌러 선택한 뒤 마이크를 눌러 메뉴를 말하세요.</div>
   </div>
+</div>
+
+<div id="cardPanel" hidden>
+  <div id="cardOrderList"></div>
+  <div class="manual-add-row">
+    <input type="text" id="manualMenuInput" placeholder="메뉴 이름 직접 추가">
+    <button id="manualAddBtn" type="button">추가</button>
+  </div>
+  <input type="text" id="cardNameInput" placeholder="이름 입력 (선택)">
 </div>
 
 <div id="bottombar">
@@ -209,11 +256,12 @@
 // ══════════════════════════════════════════
 //  상태
 // ══════════════════════════════════════════
-let cards = [];
+let cards = []; // { uid, el, orderMap:{menu:qty}, name, thumbSrc, displayLabel }
 let cardCounter = 0;
-let selectedCardId = null;
+let selectedCardId = null; // uid
 let modelsLoaded = false;
 let lastSummaryText = '';
+let cardAreaTop = 16; // 얼굴카드 기본 배치 y좌표 (메뉴판 사진 아래쪽으로 자동 조정)
 
 const stage = document.getElementById('stage');
 const menuImg = document.getElementById('menuImg');
@@ -221,6 +269,21 @@ const stagePlaceholder = document.getElementById('stagePlaceholder');
 const micBtn = document.getElementById('micBtn');
 const micLabel = document.getElementById('micLabel');
 const loadingOverlay = document.getElementById('loadingOverlay');
+const cardPanel = document.getElementById('cardPanel');
+const cardOrderList = document.getElementById('cardOrderList');
+const cardNameInput = document.getElementById('cardNameInput');
+const manualMenuInput = document.getElementById('manualMenuInput');
+
+// ══════════════════════════════════════════
+//  유틸
+// ══════════════════════════════════════════
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch]));
+}
+
+function cardLabelText(card) {
+  return card.name ? card.name : `${card.displayLabel}번`;
+}
 
 // ══════════════════════════════════════════
 //  브라우저 지원 체크
@@ -263,6 +326,24 @@ document.getElementById('menuPhotoInput').addEventListener('change', (e) => {
   stagePlaceholder.hidden = true;
   e.target.value = '';
 });
+menuImg.addEventListener('load', () => {
+  recalcCardAreaTop();
+  updateStageMinHeight();
+});
+
+function recalcCardAreaTop() {
+  cardAreaTop = (!menuImg.hidden && menuImg.clientHeight) ? menuImg.clientHeight + 16 : 16;
+}
+
+function updateStageMinHeight() {
+  let maxBottom = cardAreaTop;
+  cards.forEach(c => {
+    const top = parseFloat(c.el.style.top) || 0;
+    maxBottom = Math.max(maxBottom, top + 90);
+  });
+  const imgBottom = (!menuImg.hidden ? menuImg.clientHeight : 0);
+  stage.style.minHeight = Math.max(260, imgBottom, maxBottom + 20) + 'px';
+}
 
 // ══════════════════════════════════════════
 //  얼굴 인식 모델
@@ -308,16 +389,17 @@ document.getElementById('groupPhotoInput').addEventListener('change', async (e) 
   try {
     const img = await loadImageFromFile(file);
     await ensureModelsLoaded();
+    recalcCardAreaTop();
     const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }));
     if (detections.length === 0) {
-      toast('얼굴을 찾지 못했어요. 카드 추가로 직접 만들어주세요.');
+      toast('얼굴을 찾지 못했어요. 인물 추가로 직접 만들어주세요.');
     } else {
       detections.forEach(d => addCard(cropFaceThumbnail(img, d.box)));
       toast(`얼굴 ${detections.length}명 인식됨`);
     }
   } catch (err) {
     console.error(err);
-    toast('얼굴 인식에 실패했어요. 카드 추가로 직접 만들어주세요.');
+    toast('얼굴 인식에 실패했어요. 인물 추가로 직접 만들어주세요.');
   } finally {
     loadingOverlay.hidden = true;
   }
@@ -330,42 +412,57 @@ document.getElementById('addCardBtn').addEventListener('click', () => addCard(nu
 
 function addCard(thumbSrc) {
   cardCounter++;
-  const id = cardCounter;
-  const idx = cards.length;
+  const uid = cardCounter;
 
   const el = document.createElement('div');
   el.className = 'face-card';
-  el.style.left = (10 + (idx % 4) * 72) + 'px';
-  el.style.top = (10 + Math.floor(idx / 4) * 78) + 'px';
   el.innerHTML = `
     <button class="card-del" type="button">×</button>
     <span class="card-count" hidden>0</span>
-    ${thumbSrc ? `<img src="${thumbSrc}" alt="">` : `<div class="card-generic">${id}</div>`}
-    <div class="card-label">${id}번</div>
+    ${thumbSrc ? `<img src="${thumbSrc}" alt="">` : `<div class="card-generic">👤</div>`}
+    <div class="card-label"></div>
   `;
   stage.appendChild(el);
   stagePlaceholder.hidden = true;
 
-  const card = { id, el, orders: [] };
+  const card = { uid, el, orderMap: {}, name: '', thumbSrc, displayLabel: 0 };
+  const idx = cards.length;
+  const col = idx % 4;
+  const row = Math.floor(idx / 4);
+  el.style.left = (10 + col * 72) + 'px';
+  el.style.top = (cardAreaTop + row * 78) + 'px';
+
   cards.push(card);
   makeDraggable(card);
+  renumberCards();
+  updateStageMinHeight();
 
   el.querySelector('.card-del').addEventListener('pointerdown', (e) => e.stopPropagation());
   el.querySelector('.card-del').addEventListener('click', (e) => {
     e.stopPropagation();
-    removeCard(id);
+    removeCard(uid);
   });
 
   return card;
 }
 
-function removeCard(id) {
-  const idx = cards.findIndex(c => c.id === id);
+function renumberCards() {
+  cards.forEach((c, idx) => {
+    c.displayLabel = idx + 1;
+    c.el.querySelector('.card-label').textContent = cardLabelText(c);
+  });
+}
+
+function removeCard(uid) {
+  const idx = cards.findIndex(c => c.uid === uid);
   if (idx === -1) return;
   cards[idx].el.remove();
   cards.splice(idx, 1);
-  if (selectedCardId === id) {
+  renumberCards();
+  updateStageMinHeight();
+  if (selectedCardId === uid) {
     selectedCardId = null;
+    hideCardPanel();
     micBtn.disabled = true;
     micLabel.textContent = '카드를 선택하세요';
   }
@@ -389,23 +486,109 @@ function makeDraggable(card) {
     if (moved) {
       card.el.style.left = Math.max(0, startLeft + dx) + 'px';
       card.el.style.top = Math.max(0, startTop + dy) + 'px';
+      updateStageMinHeight();
     }
   });
   card.el.addEventListener('pointerup', () => {
     dragging = false;
-    if (!moved) selectCard(card.id);
+    if (!moved) selectCard(card.uid);
+    else updateStageMinHeight();
   });
 }
 
-function selectCard(id) {
-  selectedCardId = id;
-  cards.forEach(c => c.el.classList.toggle('selected', c.id === id));
-  micLabel.textContent = `${id}번 선택됨 — 마이크를 눌러 말하기`;
+function selectCard(uid) {
+  selectedCardId = uid;
+  cards.forEach(c => c.el.classList.toggle('selected', c.uid === uid));
+  const card = cards.find(c => c.uid === uid);
+  micLabel.textContent = `${cardLabelText(card)} 선택됨 — 마이크를 눌러 말하기`;
   micBtn.disabled = false;
+  showCardPanel(card);
 }
 
 // ══════════════════════════════════════════
-//  음성 주문 (푸시투토크)
+//  선택된 카드 패널 (주문 내역 + 직접 추가 + 이름)
+// ══════════════════════════════════════════
+function showCardPanel(card) {
+  cardPanel.hidden = false;
+  cardNameInput.value = card.name || '';
+  manualMenuInput.value = '';
+  renderCardOrderList(card);
+}
+
+function hideCardPanel() {
+  cardPanel.hidden = true;
+}
+
+function renderCardOrderList(card) {
+  const entries = Object.entries(card.orderMap);
+  if (entries.length === 0) {
+    cardOrderList.innerHTML = '<div class="order-empty">아직 주문이 없습니다</div>';
+    return;
+  }
+  cardOrderList.innerHTML = entries.map(([menu, qty]) => `
+    <div class="order-row" data-menu="${escapeHtml(menu)}">
+      <span class="order-menu">${escapeHtml(menu)}</span>
+      <button class="qty-btn minus" type="button">−</button>
+      <span class="order-qty">${qty}</span>
+      <button class="qty-btn plus" type="button">+</button>
+      <button class="order-del" type="button">×</button>
+    </div>
+  `).join('');
+}
+
+function updateCardBadge(card) {
+  const total = Object.values(card.orderMap).reduce((s, q) => s + q, 0);
+  const countEl = card.el.querySelector('.card-count');
+  if (total > 0) { countEl.hidden = false; countEl.textContent = total; }
+  else countEl.hidden = true;
+}
+
+cardOrderList.addEventListener('click', (e) => {
+  const row = e.target.closest('.order-row');
+  if (!row || selectedCardId === null) return;
+  const menu = row.dataset.menu;
+  const card = cards.find(c => c.uid === selectedCardId);
+  if (!card) return;
+  if (e.target.classList.contains('plus')) {
+    card.orderMap[menu] = (card.orderMap[menu] || 0) + 1;
+  } else if (e.target.classList.contains('minus')) {
+    card.orderMap[menu] = (card.orderMap[menu] || 0) - 1;
+    if (card.orderMap[menu] <= 0) delete card.orderMap[menu];
+  } else if (e.target.classList.contains('order-del')) {
+    delete card.orderMap[menu];
+  } else {
+    return;
+  }
+  renderCardOrderList(card);
+  updateCardBadge(card);
+});
+
+document.getElementById('manualAddBtn').addEventListener('click', addManualMenu);
+manualMenuInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addManualMenu();
+});
+function addManualMenu() {
+  const menu = manualMenuInput.value.trim();
+  if (!menu || selectedCardId === null) return;
+  const card = cards.find(c => c.uid === selectedCardId);
+  if (!card) return;
+  card.orderMap[menu] = (card.orderMap[menu] || 0) + 1;
+  manualMenuInput.value = '';
+  renderCardOrderList(card);
+  updateCardBadge(card);
+}
+
+cardNameInput.addEventListener('input', () => {
+  if (selectedCardId === null) return;
+  const card = cards.find(c => c.uid === selectedCardId);
+  if (!card) return;
+  card.name = cardNameInput.value.trim();
+  card.el.querySelector('.card-label').textContent = cardLabelText(card);
+  micLabel.textContent = `${cardLabelText(card)} 선택됨 — 마이크를 눌러 말하기`;
+});
+
+// ══════════════════════════════════════════
+//  음성 주문 (푸시투토크) — 인식 객체를 재사용해 권한 재요청을 줄임
 // ══════════════════════════════════════════
 const NUM_WORDS = {
   '한':1,'하나':1,'두':2,'둘':2,'세':3,'셋':3,'네':4,'넷':4,
@@ -438,20 +621,16 @@ function parseOrderText(text) {
 }
 
 let recognition = null;
+let recognitionActive = false;
 
-micBtn.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  if (selectedCardId === null) { toast('먼저 얼굴카드를 선택하세요'); return; }
+function getRecognition() {
+  if (recognition) return recognition;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { toast('이 브라우저는 음성인식을 지원하지 않습니다'); return; }
-
+  if (!SR) return null;
   recognition = new SR();
   recognition.lang = 'ko-KR';
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
-
-  micBtn.classList.add('listening');
-  micLabel.textContent = '듣는 중...';
 
   recognition.onresult = (ev) => {
     const text = ev.results[0][0].transcript;
@@ -463,15 +642,37 @@ micBtn.addEventListener('pointerdown', (e) => {
     else if (ev.error === 'not-allowed') toast('마이크 권한을 허용해주세요');
   };
   recognition.onend = () => {
+    recognitionActive = false;
     micBtn.classList.remove('listening');
-    if (selectedCardId !== null) micLabel.textContent = `${selectedCardId}번 선택됨 — 마이크를 눌러 말하기`;
+    const card = cards.find(c => c.uid === selectedCardId);
+    if (card) micLabel.textContent = `${cardLabelText(card)} 선택됨 — 마이크를 눌러 말하기`;
   };
+  return recognition;
+}
 
-  try { recognition.start(); } catch (err) { console.warn(err); }
+micBtn.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (selectedCardId === null) { toast('먼저 얼굴카드를 선택하세요'); return; }
+  const r = getRecognition();
+  if (!r) { toast('이 브라우저는 음성인식을 지원하지 않습니다'); return; }
+  if (recognitionActive) return;
+
+  micBtn.classList.add('listening');
+  micLabel.textContent = '듣는 중...';
+  recognitionActive = true;
+  try {
+    r.start();
+  } catch (err) {
+    console.warn(err);
+    recognitionActive = false;
+    micBtn.classList.remove('listening');
+  }
 });
 
 function stopRecognition() {
-  if (recognition) { try { recognition.stop(); } catch (err) {} }
+  if (recognition && recognitionActive) {
+    try { recognition.stop(); } catch (err) {}
+  }
 }
 micBtn.addEventListener('pointerup', stopRecognition);
 micBtn.addEventListener('pointercancel', stopRecognition);
@@ -505,15 +706,13 @@ document.getElementById('modalConfirmBtn').addEventListener('click', () => {
   addOrderToCard(selectedCardId, menu, qty);
 });
 
-function addOrderToCard(cardId, menu, qty) {
-  const card = cards.find(c => c.id === cardId);
+function addOrderToCard(uid, menu, qty) {
+  const card = cards.find(c => c.uid === uid);
   if (!card) return;
-  card.orders.push({ menu, qty });
-  const totalQty = card.orders.reduce((s, o) => s + o.qty, 0);
-  const countEl = card.el.querySelector('.card-count');
-  countEl.hidden = false;
-  countEl.textContent = totalQty;
-  toast(`${menu} ${qty}개 추가됨 (${cardId}번)`);
+  card.orderMap[menu] = (card.orderMap[menu] || 0) + qty;
+  updateCardBadge(card);
+  if (selectedCardId === uid) renderCardOrderList(card);
+  toast(`${menu} ${qty}개 추가됨 (${cardLabelText(card)})`);
 }
 
 // ══════════════════════════════════════════
@@ -524,30 +723,35 @@ const statusContent = document.getElementById('statusContent');
 
 function openStatusPanel() {
   const totalMap = {};
-  cards.forEach(c => c.orders.forEach(o => { totalMap[o.menu] = (totalMap[o.menu] || 0) + o.qty; }));
+  cards.forEach(c => {
+    Object.entries(c.orderMap).forEach(([menu, qty]) => {
+      totalMap[menu] = (totalMap[menu] || 0) + qty;
+    });
+  });
   let totalCount = 0;
   Object.values(totalMap).forEach(v => totalCount += v);
 
   let html = '<h2>전체 합계</h2><ul class="total-list">';
   if (Object.keys(totalMap).length === 0) {
-    html += '<li>아직 주문이 없습니다<span></span></li>';
+    html += '<li><span>아직 주문이 없습니다</span></li>';
   } else {
     Object.entries(totalMap).forEach(([menu, qty]) => {
-      html += `<li><span>${menu}</span><b>${qty}</b></li>`;
+      html += `<li><span>${escapeHtml(menu)}</span><b>${qty}</b></li>`;
     });
   }
   html += `</ul><p class="grand-total">총 ${totalCount}개</p><h2>인물별 주문</h2>`;
 
-  const withOrders = cards.filter(c => c.orders.length > 0);
+  const withOrders = cards.filter(c => Object.keys(c.orderMap).length > 0);
   if (withOrders.length === 0) {
     html += '<p style="color:#6b7280;font-size:13px;">주문이 배정된 카드가 없습니다</p>';
   } else {
     withOrders.forEach(c => {
-      const personMap = {};
-      c.orders.forEach(o => { personMap[o.menu] = (personMap[o.menu] || 0) + o.qty; });
-      html += `<div class="person-block"><div class="person-title">${c.id}번</div><ul>`;
-      Object.entries(personMap).forEach(([menu, qty]) => {
-        html += `<li><span>${menu}</span><span>x${qty}</span></li>`;
+      const avatarHtml = c.thumbSrc
+        ? `<img class="mini-avatar" src="${c.thumbSrc}" alt="">`
+        : `<div class="mini-avatar" style="display:flex;align-items:center;justify-content:center;">👤</div>`;
+      html += `<div class="person-block"><div class="person-title">${avatarHtml}<span>${escapeHtml(cardLabelText(c))}</span></div><ul>`;
+      Object.entries(c.orderMap).forEach(([menu, qty]) => {
+        html += `<li><span>${escapeHtml(menu)}</span><span>x${qty}</span></li>`;
       });
       html += `</ul></div>`;
     });
@@ -562,11 +766,9 @@ function buildSummaryText(totalMap, totalCount) {
   const lines = ['[전체 합계]'];
   Object.entries(totalMap).forEach(([menu, qty]) => lines.push(`${menu} ${qty}`));
   lines.push(`총 ${totalCount}개`, '', '[인물별 주문]');
-  cards.filter(c => c.orders.length > 0).forEach(c => {
-    const personMap = {};
-    c.orders.forEach(o => { personMap[o.menu] = (personMap[o.menu] || 0) + o.qty; });
-    const items = Object.entries(personMap).map(([m, q]) => `${m} x${q}`).join(', ');
-    lines.push(`${c.id}번: ${items}`);
+  cards.filter(c => Object.keys(c.orderMap).length > 0).forEach(c => {
+    const items = Object.entries(c.orderMap).map(([m, q]) => `${m} x${q}`).join(', ');
+    lines.push(`${cardLabelText(c)}: ${items}`);
   });
   return lines.join('\n');
 }
@@ -584,10 +786,23 @@ document.getElementById('copyBtn').addEventListener('click', async () => {
 });
 
 // ══════════════════════════════════════════
-//  초기화
+//  초기화 (주문만 초기화 / 전체 초기화)
 // ══════════════════════════════════════════
+document.getElementById('orderResetBtn').addEventListener('click', () => {
+  if (!confirm('모든 주문 내역을 초기화할까요? (인물카드와 이름은 유지됩니다)')) return;
+  cards.forEach(c => {
+    c.orderMap = {};
+    updateCardBadge(c);
+  });
+  if (selectedCardId !== null) {
+    const card = cards.find(c => c.uid === selectedCardId);
+    if (card) renderCardOrderList(card);
+  }
+  toast('주문 내역이 초기화되었습니다');
+});
+
 document.getElementById('resetBtn').addEventListener('click', () => {
-  if (!confirm('모든 내용을 초기화할까요?')) return;
+  if (!confirm('사진, 인물카드, 주문 내역을 모두 초기화할까요?')) return;
   cards.forEach(c => c.el.remove());
   cards = [];
   cardCounter = 0;
@@ -595,6 +810,9 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   menuImg.src = '';
   menuImg.hidden = true;
   stagePlaceholder.hidden = false;
+  cardAreaTop = 16;
+  stage.style.minHeight = '';
+  hideCardPanel();
   micBtn.disabled = true;
   micLabel.textContent = '카드를 선택하세요';
 });
