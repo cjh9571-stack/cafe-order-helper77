@@ -300,6 +300,18 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// 페이지 로드 시 마이크 권한을 한 번 미리 요청해서 크롬에 "허용"을 정식으로 저장시킴
+// (음성인식 버튼을 누를 때마다 권한을 다시 묻는 것을 줄이기 위한 조치)
+(async function warmupMicPermission() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(t => t.stop());
+  } catch (err) {
+    console.warn('mic warmup failed', err);
+  }
+})();
+
 // ══════════════════════════════════════════
 //  토스트
 // ══════════════════════════════════════════
